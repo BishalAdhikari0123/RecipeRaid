@@ -9,9 +9,19 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Get token from localStorage (Zustand persist uses this)
+  if (typeof window !== 'undefined') {
+    const storage = localStorage.getItem('auth-storage');
+    if (storage) {
+      try {
+        const { state } = JSON.parse(storage);
+        if (state?.token) {
+          config.headers.Authorization = `Bearer ${state.token}`;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
   }
   return config;
 });
@@ -21,9 +31,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/auth/login';
+      // Clear auth storage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth-storage');
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -60,13 +72,17 @@ export const teamsAPI = {
 
 // Raids API
 export const raidsAPI = {
-  start: (data: { teamId: string; bossId: string }) =>
+  start: (data: { teamId?: string | null; bossId: string; mode?: 'solo' | 'team' }) =>
     api.post('/raids/start', data),
   complete: (raidId: string, data: { score: number; timeTakenMinutes: number; notes?: string }) =>
     api.put(`/raids/${raidId}/complete`, data),
   get: (raidId: string) => api.get(`/raids/${raidId}`),
+  getUserRaids: (params?: { status?: string; mode?: string }) =>
+    api.get('/raids/my-raids', { params }),
   getTeamRaids: (teamId: string, status?: string) =>
     api.get(`/raids/team/${teamId}`, { params: { status } }),
+  getAvailableBosses: (params?: { difficulty?: string; limit?: number }) =>
+    api.get('/raids/bosses', { params }),
   uploadPhoto: (raidId: string, data: { photoUrl: string; storagePath: string }) =>
     api.post(`/raids/${raidId}/photo`, data),
   abandon: (raidId: string) => api.put(`/raids/${raidId}/abandon`),

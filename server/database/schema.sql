@@ -85,8 +85,10 @@ CREATE TABLE recipe_bosses (
 -- Raids (Active or Completed Boss Battles)
 CREATE TABLE raids (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
     boss_id UUID REFERENCES recipe_bosses(id) ON DELETE CASCADE,
+    mode VARCHAR(20) DEFAULT 'solo', -- solo, team
     status VARCHAR(20) DEFAULT 'active', -- active, completed, failed, abandoned
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP,
@@ -193,7 +195,9 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_team_members_user ON team_members(user_id);
 CREATE INDEX idx_team_members_team ON team_members(team_id);
 CREATE INDEX idx_raids_team ON raids(team_id);
+CREATE INDEX idx_raids_user ON raids(user_id);
 CREATE INDEX idx_raids_status ON raids(status);
+CREATE INDEX idx_raids_mode ON raids(mode);
 CREATE INDEX idx_raid_participants_raid ON raid_participants(raid_id);
 CREATE INDEX idx_raid_participants_user ON raid_participants(user_id);
 CREATE INDEX idx_leaderboards_period ON leaderboards(period, period_start, period_end);

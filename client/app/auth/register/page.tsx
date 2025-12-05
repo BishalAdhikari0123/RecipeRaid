@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authAPI } from "@/lib/api";
@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const { user, isHydrated, setAuth } = useAuthStore();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -17,6 +17,13 @@ export default function RegisterPage() {
     displayName: "",
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Redirect to dashboard if already logged in
+    if (isHydrated && user) {
+      router.push("/dashboard");
+    }
+  }, [user, isHydrated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

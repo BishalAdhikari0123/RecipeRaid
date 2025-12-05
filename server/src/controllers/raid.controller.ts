@@ -5,21 +5,23 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export const startRaid = async (req: AuthRequest, res: Response): Promise<void> => {
   const client = await pool.connect();
   try {
-    const { teamId, bossId } = req.body;
+    const { teamId, bossId, mode = 'solo' } = req.body;
     const userId = req.user!.id;
 
     await client.query('BEGIN');
 
-    // Check if user is in team
-    const teamMember = await client.query(
-      'SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2',
-      [teamId, userId]
-    );
+    // If team mode, check if user is in team
+    if (mode === 'team' && teamId) {
+      const teamMember = await client.query(
+        'SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2',
+        [teamId, userId]
+      );
 
-    if (teamMember.rows.length === 0) {
-      await client.query('ROLLBACK');
-      res.status(403).json({ error: 'You are not a member of this team' });
-      return;
+      if (teamMember.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(403).json({ error: 'You are not a member of this team' });
+        return;
+      }
     }
 
     // Get boss details
@@ -36,10 +38,10 @@ export const startRaid = async (req: AuthRequest, res: Response): Promise<void> 
 
     // Create raid
     const raid = await client.query(
-      `INSERT INTO raids (team_id, boss_id, status)
-       VALUES ($1, $2, 'active')
+      `INSERT INTO raids (user_id, team_id, boss_id, mode, status)
+       VALUES ($1, $2, $3, $4, 'active')
        RETURNING *`,
-      [teamId, bossId]
+      [userId, teamId || null, bossId, mode]
     );
 
     // Add user as participant
@@ -110,13 +112,15 @@ export const completeRaid = async (req: AuthRequest, res: Response): Promise<voi
       [score, userId]
     );
 
-    // Update team score
-    await client.query(
-      `UPDATE teams
-       SET team_score = team_score + $1
-       WHERE id = $2`,
-      [score, raid.rows[0].team_id]
-    );
+    // Update team score if team raid
+    if (raid.rows[0].team_id) {
+      await client.query(
+        `UPDATE teams
+         SET team_score = team_score + $1
+         WHERE id = $2`,
+        [score, raid.rows[0].team_id]
+      );
+    }
 
     await client.query('COMMIT');
 
@@ -140,7 +144,7 @@ export const getRaidDetails = async (req: AuthRequest, res: Response): Promise<v
               t.name as team_name
        FROM raids r
        JOIN recipe_bosses rb ON r.boss_id = rb.id
-       JOIN teams t ON r.team_id = t.id
+       LEFT JOIN teams t ON r.team_id = t.id
        WHERE r.id = $1`,
       [raidId]
     );
@@ -268,5 +272,77 @@ export const abandonRaid = async (req: AuthRequest, res: Response): Promise<void
   } catch (error) {
     console.error('Abandon raid error:', error);
     res.status(500).json({ error: 'Failed to abandon raid' });
+  }
+};
+
+export const getUserRaids = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { status, mode } = req.query;
+
+    let query = `
+      SELECT r.*, rb.name as boss_name, rb.difficulty, rb.difficulty_level,
+             t.name as team_name
+      FROM raids r
+      JOIN recipe_bosses rb ON r.boss_id = rb.id
+      LEFT JOIN teams t ON r.team_id = t.id
+      WHERE r.user_id = $1
+    `;
+
+    const values: any[] = [userId];
+    let paramCount = 2;
+
+    if (status) {
+      query += ` AND r.status = $${paramCount}`;
+      values.push(status);
+      paramCount++;
+    }
+
+    if (mode) {
+      query += ` AND r.mode = $${paramCount}`;
+      values.push(mode);
+      paramCount++;
+    }
+
+    query += ' ORDER BY r.created_at DESC LIMIT 50';
+
+    const result = await pool.query(query, values);
+
+    res.json({ raids: result.rows });
+  } catch (error) {
+    console.error('Get user raids error:', error);
+    res.status(500).json({ error: 'Failed to get user raids' });
+  }
+};
+
+export const getAvailableBosses = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { difficulty, limit = 20 } = req.query;
+
+    let query = `
+      SELECT id, name, description, difficulty, difficulty_level,
+             cuisine_type, prep_time_minutes, cook_time_minutes,
+             servings, base_score
+      FROM recipe_bosses
+    `;
+
+    const values: any[] = [];
+    let paramCount = 1;
+
+    if (difficulty) {
+      query += ` WHERE difficulty = $${paramCount}`;
+      values.push(difficulty);
+      paramCount++;
+    }
+
+    query += ` ORDER BY difficulty_level ASC, name ASC LIMIT $${paramCount}`;
+    values.push(limit);
+
+    const result = await pool.query(query, values);
+
+    res.json({ bosses: result.rows });
+  } catch (error) {
+    console.error('Get available bosses error:', error);
+    res.status(500).json({ error: 'Failed to get available bosses' });
   }
 };

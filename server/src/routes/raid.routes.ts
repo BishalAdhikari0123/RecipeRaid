@@ -6,6 +6,8 @@ import {
   getTeamRaids,
   uploadPhotoProof,
   abandonRaid,
+  getUserRaids,
+  getAvailableBosses,
 } from '../controllers/raid.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
@@ -15,6 +17,8 @@ const router = Router();
 
 router.post('/start', authenticate, validate(startRaidSchema), startRaid);
 router.put('/:raidId/complete', authenticate, validate(completeRaidSchema), completeRaid);
+router.get('/my-raids', authenticate, getUserRaids);
+router.get('/bosses', authenticate, getAvailableBosses);
 router.get('/:raidId', authenticate, getRaidDetails);
 router.get('/team/:teamId', authenticate, getTeamRaids);
 router.post('/:raidId/photo', authenticate, uploadPhotoProof);

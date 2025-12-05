@@ -1,8 +1,9 @@
 import Joi from 'joi';
 
 export const startRaidSchema = Joi.object({
-  teamId: Joi.string().uuid().required(),
+  teamId: Joi.string().uuid().optional().allow(null),
   bossId: Joi.string().uuid().required(),
+  mode: Joi.string().valid('solo', 'team').default('solo'),
 });
 
 export const completeRaidSchema = Joi.object({

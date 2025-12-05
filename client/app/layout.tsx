@@ -1,13 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Recipe Raid Co-op",
   description: "Gamified cooking adventures - Raid bosses with your team!",
   manifest: "/manifest.json",
-  themeColor: "#8b5cf6",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -16,10 +22,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        {children}
-        <Toaster position="top-right" />
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-white dark:bg-black text-black dark:text-white transition-colors">
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );
