@@ -1,9 +1,8 @@
 import { Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from "bcryptjs";
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { AppError } from '../middleware/error.middleware';
 
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -20,7 +19,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    // Hash password
+    // Hash password (bcryptjs)
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
@@ -34,6 +33,10 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
     const user = result.rows[0];
 
     // Generate JWT
+    const secret = process.env.JWT_SECRET || '';
+    if (!secret) {
+      throw new Error('JWT_SECRET is not set');
+    }
     const token = jwt.sign(
       {
         id: user.id,
@@ -41,8 +44,8 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
         username: user.username,
         isPremium: user.is_premium,
       },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      secret,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
     );
 
     res.status(201).json({
@@ -61,6 +64,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
   }
 };
 
+// LOGIN
 export const login = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
@@ -87,6 +91,10 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     // Generate JWT
+    const secret = process.env.JWT_SECRET || '';
+    if (!secret) {
+      throw new Error('JWT_SECRET is not set');
+    }
     const token = jwt.sign(
       {
         id: user.id,
@@ -94,8 +102,8 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
         username: user.username,
         isPremium: user.is_premium,
       },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      secret,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' } as jwt.SignOptions
     );
 
     res.json({
@@ -117,6 +125,7 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
   }
 };
 
+// PROFILE
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
@@ -138,6 +147,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
   }
 };
 
+// UPDATE PROFILE
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { displayName, avatarUrl } = req.body;
